@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: WordPress to Markdown Exporter
- * Plugin URI: 
+ * Plugin URI: https://github.com/jonathanbossenger/wp-to-md-exporter
  * Description: Export WordPress posts and custom post types to Markdown format
  * Version: 1.0.0
- * Author: 
- * Author URI: 
+ * Author: Jonathan Bossenger
+ * Author URI: https://jonathanbossenger.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wp-to-md
