@@ -1,0 +1,14 @@
+.wp-to-md-container {
+	max-width: 800px;
+	margin-top: 20px;
+}
+
+.wp-to-md-previous-exports {
+	margin-top: 40px;
+	padding-top: 20px;
+	border-top: 1px solid #ccd0d4;
+}
+
+.wp-to-md-previous-exports h2 {
+	margin-bottom: 15px;
+} 
