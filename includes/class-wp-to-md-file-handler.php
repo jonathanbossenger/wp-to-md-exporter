@@ -67,8 +67,26 @@ class WP_To_MD_File_Handler {
 			return new WP_Error( 'filesystem_error', __( 'WordPress Filesystem API not initialized.', 'wp-to-md' ) );
 		}
 
+		// First check if uploads directory exists and is writable.
+		$upload_dir = wp_upload_dir();
+		if ( ! empty( $upload_dir['error'] ) ) {
+			return new WP_Error( 'uploads_dir_error', $upload_dir['error'] );
+		}
+
+		if ( ! $this->filesystem->is_writable( $upload_dir['basedir'] ) ) {
+			return new WP_Error(
+				'uploads_not_writable',
+				sprintf(
+					/* translators: %s: Directory path */
+					__( 'Uploads directory is not writable: %s', 'wp-to-md' ),
+					$upload_dir['basedir']
+				)
+			);
+		}
+
+		// Create base exports directory if it doesn't exist.
 		if ( ! $this->filesystem->is_dir( $this->base_dir ) ) {
-			if ( ! $this->filesystem->mkdir( $this->base_dir ) ) {
+			if ( ! wp_mkdir_p( $this->base_dir ) ) {
 				return new WP_Error(
 					'directory_creation_failed',
 					sprintf(
@@ -95,11 +113,17 @@ class WP_To_MD_File_Handler {
 	 * @return string|WP_Error Directory path on success, WP_Error on failure.
 	 */
 	public function create_export_directory() {
+		// First ensure base exports directory exists.
+		$result = $this->create_exports_directory();
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		$date_dir = gmdate( 'Y/m/d' );
 		$export_dir = trailingslashit( $this->base_dir ) . $date_dir;
 
 		if ( ! $this->filesystem->is_dir( $export_dir ) ) {
-			if ( ! $this->filesystem->mkdir( $export_dir, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $export_dir ) ) {
 				return new WP_Error(
 					'export_directory_creation_failed',
 					sprintf(

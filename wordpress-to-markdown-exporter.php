@@ -62,9 +62,14 @@ class WordPress_To_Markdown_Exporter {
      * Initialize WordPress hooks
      */
     private function init_hooks() {
+        // Load required classes
+        require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-converter.php';
+        require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-file-handler.php';
+        require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-exporter.php';
+
         // Load admin class
         if ( is_admin() ) {
-            require_once WP_TO_MD_PLUGIN_DIR . 'admin/class-admin-page.php';
+            require_once WP_TO_MD_PLUGIN_DIR . 'admin/class-wp-to-md-admin-page.php';
             new WP_To_MD_Admin_Page();
         }
     }
