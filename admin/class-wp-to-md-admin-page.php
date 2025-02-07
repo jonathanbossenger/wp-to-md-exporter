@@ -187,4 +187,44 @@ class WP_To_MD_Admin_Page {
 	public function render_test_page() {
 		require_once WP_TO_MD_PLUGIN_DIR . 'tests/run-tests.php';
 	}
+
+	/**
+	 * Display previous exports section.
+	 */
+	private function display_previous_exports() {
+		$file_handler = new WP_To_MD_File_Handler();
+		$exports = $file_handler->list_exports();
+		?>
+		<div class="previous-exports">
+			<h3><?php esc_html_e( 'Previous Exports', 'wp-to-md' ); ?></h3>
+			<?php if ( empty( $exports ) ) : ?>
+				<p><?php esc_html_e( 'No previous exports found.', 'wp-to-md' ); ?></p>
+			<?php else : ?>
+				<table class="widefat">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Date', 'wp-to-md' ); ?></th>
+							<th><?php esc_html_e( 'Size', 'wp-to-md' ); ?></th>
+							<th><?php esc_html_e( 'Actions', 'wp-to-md' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $exports as $export ) : ?>
+							<tr>
+								<td><?php echo esc_html( $export['date'] ); ?></td>
+								<td><?php echo esc_html( size_format( $export['size'] ) ); ?></td>
+								<td>
+									<a href="<?php echo esc_url( $export['url'] ); ?>" class="button">
+										<?php esc_html_e( 'Download', 'wp-to-md' ); ?>
+									</a>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
 } 
+

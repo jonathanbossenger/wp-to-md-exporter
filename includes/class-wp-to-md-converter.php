@@ -281,10 +281,10 @@ class WP_To_MD_Converter {
 	public function convert_post_to_markdown( $post ) {
 		// Get post metadata.
 		$metadata = $this->get_post_metadata( $post );
-
+		
 		// Convert content to markdown using existing convert method.
 		$markdown_content = $this->convert( $post->post_content );
-
+		
 		// Combine metadata and content.
 		return $this->format_with_metadata( $metadata, $markdown_content );
 	}
