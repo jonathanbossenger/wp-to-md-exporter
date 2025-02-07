@@ -1,4 +1,4 @@
-<?php
+q<?php
 /**
  * Plugin Name: WordPress to Markdown Exporter
  * Plugin URI: https://github.com/jonathanbossenger/wp-to-md-exporter
@@ -62,12 +62,11 @@ class WordPress_To_Markdown_Exporter {
      * Initialize WordPress hooks
      */
     private function init_hooks() {
-        // Load required classes
         require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-converter.php';
         require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-file-handler.php';
         require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-exporter.php';
+        require_once WP_TO_MD_PLUGIN_DIR . 'includes/class-wp-to-md-metadata.php';
 
-        // Load admin class
         if ( is_admin() ) {
             require_once WP_TO_MD_PLUGIN_DIR . 'admin/class-wp-to-md-admin-page.php';
             new WP_To_MD_Admin_Page();
@@ -89,9 +88,7 @@ class WordPress_To_Markdown_Exporter {
     }
 }
 
-// Register activation and deactivation hooks
 register_activation_hook( __FILE__, array( 'WordPress_To_Markdown_Exporter', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'WordPress_To_Markdown_Exporter', 'deactivate' ) );
 
-// Initialize the plugin
-WordPress_To_Markdown_Exporter::get_instance(); 
+WordPress_To_Markdown_Exporter::get_instance();

@@ -1,183 +1,117 @@
 <?php
 /**
- * HTML to Markdown converter class.
+ * HTML to Markdown converter class
  *
  * @package WordPress_To_Markdown_Exporter
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly.
+	exit; // Exit if accessed directly
 }
 
 /**
  * Class WP_To_MD_Converter
  */
 class WP_To_MD_Converter {
+
 	/**
-	 * Convert HTML to Markdown.
+	 * Convert post content to Markdown with metadata
 	 *
-	 * @param string $html The HTML content to convert.
-	 * @return string The converted Markdown content.
+	 * @param WP_Post $post The post object to convert.
+	 * @return string The converted markdown content with metadata
 	 */
-	public function convert( $html ) {
-		// Clean the content first.
-		$html = $this->clean_content( $html );
+	public function convert_post_to_markdown( $post ) {
+		// Get post metadata
+		$metadata = $this->get_post_metadata( $post );
 
-		// Convert blocks to markdown.
-		$markdown = $this->handle_blocks( $html );
+		// Convert the post content to Markdown
+		$markdown_content = $this->convert_content_to_markdown( $post->post_content );
 
-		return $markdown;
+		// Combine metadata and content
+		return $this->combine_metadata_and_content( $metadata, $markdown_content );
 	}
 
 	/**
-	 * Clean the content before conversion.
+	 * Add metadata to converted markdown content
 	 *
-	 * @param string $content The content to clean.
-	 * @return string The cleaned content.
+	 * @param WP_Post $post The post object.
+	 * @param string  $markdown_content The converted markdown content.
+	 * @return string The markdown content with metadata
 	 */
-	private function clean_content( $content ) {
-		// Remove HTML comments.
-		$content = preg_replace( '/<!--(.|\s)*?-->/', '', $content );
+	public function add_post_metadata( $post, $markdown_content ) {
+		// Get post metadata
+		$metadata = $this->get_post_metadata( $post );
 
-		// Remove embedded content (iframes).
-		$content = preg_replace( '/<iframe.*?\/iframe>/i', '', $content );
+		// Combine metadata and content
+		return $this->combine_metadata_and_content( $metadata, $markdown_content );
+	}
+	/**
+	 * Get post metadata formatted for YAML front matter
+	 *
+	 * @param WP_Post $post The post object.
+	 * @return array The post metadata
+	 */
+	private function get_post_metadata( $post ) {
+		// Get the author
+		$author = get_user_by( 'ID', $post->post_author );
 
-		// Remove script tags.
-		$content = preg_replace( '/<script\b[^>]*>(.*?)<\/script>/is', '', $content );
+		// Get featured image
+		$featured_image = '';
+		if ( has_post_thumbnail( $post ) ) {
+			$featured_image = get_the_post_thumbnail_url( $post, 'full' );
+		}
 
-		// Remove style tags.
-		$content = preg_replace( '/<style\b[^>]*>(.*?)<\/style>/is', '', $content );
+		// Get categories
+		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
+		$categories_string = ! empty( $categories ) ? implode( ', ', $categories ) : '';
 
-		return $content;
+		return array(
+			'title'           => html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
+			'publish_date'    => get_the_date( 'Y-m-d H:i:s', $post ),
+			'author'          => $author ? $author->display_name : '',
+			'featured_image'  => $featured_image,
+			'categories'      => $categories_string,
+		);
 	}
 
 	/**
-	 * Handle WordPress blocks conversion.
+	 * Convert HTML content to Markdown
 	 *
-	 * @param string $content The content containing blocks.
-	 * @return string The content with blocks converted to Markdown.
+	 * @param string $content The HTML content to convert.
+	 * @return string The converted markdown content
 	 */
-	private function handle_blocks( $content ) {
-		// Convert headings.
-		$content = preg_replace_callback(
-			'/<h([1-6])[^>]*>(.*?)<\/h\1>/i',
-			array( $this, 'convert_heading' ),
-			$content
-		);
-
-		// Convert paragraphs.
-		$content = preg_replace_callback(
-			'/<p[^>]*>(.*?)<\/p>/is',
-			array( $this, 'convert_paragraph' ),
-			$content
-		);
-
-		// Convert unordered lists.
-		$content = preg_replace_callback(
-			'/<ul[^>]*>(.*?)<\/ul>/is',
-			array( $this, 'convert_unordered_list' ),
-			$content
-		);
-
-		// Convert ordered lists.
-		$content = preg_replace_callback(
-			'/<ol[^>]*>(.*?)<\/ol>/is',
-			array( $this, 'convert_ordered_list' ),
-			$content
-		);
-
-		// Convert links.
-		$content = preg_replace_callback(
-			'/<a[^>]+href=([\'"])(.*?)\1[^>]*>(.*?)<\/a>/i',
-			array( $this, 'convert_link' ),
-			$content
-		);
-
-		// Convert images.
-		$content = preg_replace_callback(
-			'/<img[^>]+src=([\'"])(.*?)\1[^>]*>/i',
-			array( $this, 'convert_image' ),
-			$content
-		);
-
-		// Convert blockquotes.
-		$content = preg_replace_callback(
-			'/<blockquote[^>]*>(.*?)<\/blockquote>/is',
-			array( $this, 'convert_blockquote' ),
-			$content
-		);
-
-		// Convert code blocks.
-		$content = preg_replace_callback(
-			'/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/is',
-			array( $this, 'convert_code_block' ),
-			$content
-		);
-
-		// Convert inline code.
-		$content = preg_replace( '/<code[^>]*>(.*?)<\/code>/i', '`$1`', $content );
-
-		// Convert emphasis (italic).
-		$content = preg_replace( '/<em[^>]*>(.*?)<\/em>/i', '*$1*', $content );
-		$content = preg_replace( '/<i[^>]*>(.*?)<\/i>/i', '*$1*', $content );
-
-		// Convert strong (bold).
-		$content = preg_replace( '/<strong[^>]*>(.*?)<\/strong>/i', '**$1**', $content );
-		$content = preg_replace( '/<b[^>]*>(.*?)<\/b>/i', '**$1**', $content );
-
-		// Convert horizontal rules.
-		$content = preg_replace( '/<hr[^>]*>/i', "\n---\n\n", $content );
-
-		// Clean up multiple newlines.
-		$content = preg_replace( "/\n{3,}/", "\n\n", $content );
-
-		return trim( $content );
+	private function convert_content_to_markdown( $content ) {
+		// TODO: Implement actual HTML to Markdown conversion
+		// For now, return stripped content as placeholder
+		return wp_strip_all_tags( $content );
 	}
-
 	/**
-	 * Convert heading to Markdown.
+	 * Combine metadata and content into final Markdown format
 	 *
-	 * @param array $matches The regex matches.
-	 * @return string The converted heading.
+	 * @param array  $metadata The post metadata.
+	 * @param string $content The markdown content.
+	 * @return string The combined markdown with metadata
 	 */
-	private function convert_heading( $matches ) {
-		$level = $matches[1];
-		$text = trim( strip_tags( $matches[2] ) );
-		return str_repeat( '#', $level ) . ' ' . $text . "\n\n";
-	}
+	private function combine_metadata_and_content( $metadata, $content ) {
+		$yaml = "---\n";
 
-	/**
-	 * Convert paragraph to Markdown.
-	 *
-	 * @param array $matches The regex matches.
-	 * @return string The converted paragraph.
-	 */
-	private function convert_paragraph( $matches ) {
-		$text = trim( strip_tags( $matches[1] ) );
-		return $text . "\n\n";
-	}
-
-	/**
-	 * Convert unordered list to Markdown.
-	 *
-	 * @param array $matches The regex matches.
-	 * @return string The converted list.
-	 */
-	private function convert_unordered_list( $matches ) {
-		// Split into individual list items.
-		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
-		$list_items = array();
-		
-		foreach ( $items as $item ) {
-			if ( empty( trim( $item ) ) ) {
+		foreach ( $metadata as $key => $value ) {
+			// Skip empty values
+			if ( empty( $value ) ) {
 				continue;
 			}
-			$item = preg_replace( '/<\/li>/', '', $item );
-			$list_items[] = '* ' . trim( strip_tags( $item ) );
+
+			// Properly escape string values
+			if ( is_string( $value ) ) {
+				$value = str_replace( '"', '\"', $value );
+				$value = '"' . $value . '"';
+			}
+			$yaml .= sprintf( "%s: %s\n", $key, $value );
 		}
-		
-		// Join with literal \n for string comparison in tests.
-		return str_replace( "\n", '\n', implode( "\n", $list_items ) );
+
+		$yaml .= "---\n\n";
+
+		return $yaml . $content;
 	}
 
 	/**
@@ -193,11 +127,11 @@ class WP_To_MD_Converter {
 		foreach ( $items as $item ) {
 			if ( empty( trim( $item ) ) ) {
 				continue;
-			}
+		}
 			$item = preg_replace( '/<\/li>/', '', $item );
 			$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
 			$counter++;
-		}
+	}
 		return $markdown . "\n";
 	}
 
@@ -271,4 +205,4 @@ class WP_To_MD_Converter {
 
 		return $filename . '.md';
 	}
-} 
+}
