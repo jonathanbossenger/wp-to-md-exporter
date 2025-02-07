@@ -131,7 +131,7 @@ class WP_To_MD_Exporter {
 	 */
 	private function process_post( $post, $export_dir, $date_prefix ) {
 		// Convert content to Markdown.
-		$markdown = $this->converter->convert( $post->post_content );
+		$markdown = $this->converter->convert_post_to_markdown( $post );
 		if ( empty( $markdown ) ) {
 			return new WP_Error(
 				'empty_content',

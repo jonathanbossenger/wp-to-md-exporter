@@ -346,4 +346,37 @@ class WP_To_MD_File_Handler {
 	public function get_base_dir() {
 		return $this->base_dir;
 	}
+
+	/**
+	 * Write markdown content to a file.
+	 *
+	 * @param string $filename The filename to write to.
+	 * @param string $content  The markdown content.
+	 * @return bool Whether the write was successful.
+	 */
+	public function write_markdown_file( $filename, $content ) {
+		// Make sure we have the WP Filesystem initialized
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		WP_Filesystem();
+		global $wp_filesystem;
+
+		$upload_dir = wp_upload_dir();
+		$export_dir = trailingslashit( $upload_dir['basedir'] ) . 'markdown-exports/';
+
+		// Create directory if it doesn't exist
+		if ( ! $wp_filesystem->exists( $export_dir ) ) {
+			$wp_filesystem->mkdir( $export_dir );
+		}
+
+		$file_path = $export_dir . $filename;
+		
+		// Write the content with UTF-8 encoding
+		return $wp_filesystem->put_contents( 
+			$file_path, 
+			$content, 
+			FS_CHMOD_FILE 
+		);
+	}
 } 

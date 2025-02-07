@@ -271,4 +271,72 @@ class WP_To_MD_Converter {
 
 		return $filename . '.md';
 	}
+
+	/**
+	 * Convert post content to markdown and add metadata.
+	 *
+	 * @param WP_Post $post Post object to convert.
+	 * @return string Markdown content with metadata.
+	 */
+	public function convert_post_to_markdown( $post ) {
+		// Get post metadata.
+		$metadata = $this->get_post_metadata( $post );
+
+		// Convert content to markdown using existing convert method.
+		$markdown_content = $this->convert( $post->post_content );
+
+		// Combine metadata and content.
+		return $this->format_with_metadata( $metadata, $markdown_content );
+	}
+
+	/**
+	 * Get post metadata to include in markdown.
+	 *
+	 * @param WP_Post $post Post object.
+	 * @return array Metadata array.
+	 */
+	private function get_post_metadata( $post ) {
+		$author = get_user_by( 'ID', $post->post_author );
+		
+		// Get featured image URL if one exists.
+		$featured_image = '';
+		if ( has_post_thumbnail( $post->ID ) ) {
+			$featured_image = get_the_post_thumbnail_url( $post->ID, 'full' );
+		}
+
+		// Get categories.
+		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
+		$categories_string = ! empty( $categories ) ? implode( ', ', $categories ) : '';
+
+		return array(
+			'title'           => $post->post_title,
+			'publish_date'    => get_the_date( 'Y-m-d H:i:s', $post ),
+			'author'          => $author ? $author->display_name : '',
+			'featured_image'  => $featured_image,
+			'categories'      => $categories_string,
+		);
+	}
+
+	/**
+	 * Format markdown content with metadata.
+	 *
+	 * @param array  $metadata Post metadata.
+	 * @param string $content  Markdown content.
+	 * @return string Formatted markdown with metadata.
+	 */
+	private function format_with_metadata( $metadata, $content ) {
+		$yaml = "---\n";
+		
+		foreach ( $metadata as $key => $value ) {
+			// Skip empty values.
+			if ( empty( $value ) ) {
+				continue;
+			}
+			$yaml .= sprintf( "%s: %s\n", $key, $value );
+		}
+		
+		$yaml .= "---\n\n";
+		
+		return $yaml . $content;
+	}
 } 
