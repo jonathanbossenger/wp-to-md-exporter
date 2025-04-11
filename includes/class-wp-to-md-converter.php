@@ -142,7 +142,7 @@ class WP_To_MD_Converter {
 	 */
 	private function convert_heading( $matches ) {
 		$level = $matches[1];
-		$text = trim( strip_tags( $matches[2] ) );
+		$text  = trim( wp_strip_all_tags( $matches[2] ) );
 		return str_repeat( '#', $level ) . ' ' . $text . "\n\n";
 	}
 
@@ -153,52 +153,63 @@ class WP_To_MD_Converter {
 	 * @return string The converted paragraph.
 	 */
 	private function convert_paragraph( $matches ) {
-		$text = trim( strip_tags( $matches[1] ) );
+		$text = trim( wp_strip_all_tags( $matches[1] ) );
 		return $text . "\n\n";
 	}
 
 	/**
-	 * Convert unordered list to Markdown.
+	 * Convert unordered list to Markdown, including nested lists.
 	 *
 	 * @param array $matches The regex matches.
 	 * @return string The converted list.
 	 */
 	private function convert_unordered_list( $matches ) {
-		// Split into individual list items.
-		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
-		$list_items = array();
-		
-		foreach ( $items as $item ) {
-			if ( empty( trim( $item ) ) ) {
-				continue;
-			}
-			$item = preg_replace( '/<\/li>/', '', $item );
-			$list_items[] = '* ' . trim( strip_tags( $item ) );
-		}
-		
-		// Join with literal \n for string comparison in tests.
-		return str_replace( "\n", '\n', implode( "\n", $list_items ) );
+		return $this->process_list( $matches[1], '*' );
 	}
 
 	/**
-	 * Convert ordered list to Markdown.
+	 * Convert ordered list to Markdown, including nested lists.
 	 *
 	 * @param array $matches The regex matches.
 	 * @return string The converted list.
 	 */
 	private function convert_ordered_list( $matches ) {
-		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
-		$markdown = '';
-		$counter = 1;
-		foreach ( $items as $item ) {
-			if ( empty( trim( $item ) ) ) {
-				continue;
-			}
-			$item = preg_replace( '/<\/li>/', '', $item );
-			$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
-			$counter++;
-		}
-		return $markdown . "\n";
+		return $this->process_list( $matches[1], '1.' );
+	}
+
+	/**
+	 * Process a list (unordered or ordered) and convert it to Markdown.
+	 *
+	 * @param string $content The HTML content of the list.
+	 * @param string $marker  The marker for the list (* for unordered, 1. for ordered).
+	 * @param int    $level   The current nesting level (used for indentation).
+	 * @return string The converted Markdown list.
+	 */
+	private function process_list( $content, $marker, $level = 0 ) {
+		$indent  = str_repeat( '  ', $level );
+		$pattern = '/<li[^>]*>(.*?)<\/li>/is';
+
+		return preg_replace_callback(
+			$pattern,
+			function ( $matches ) use ( $marker, $level, $indent ) {
+				$item_content = $matches[1];
+
+				// Check for nested lists.
+				$item_content = preg_replace_callback(
+					'/<(ul|ol)[^>]*>(.*?)<\/\1>/is',
+					function ( $nested_matches ) use ( $level ) {
+						$nested_marker = 'ul' === $nested_matches[1] ? '*' : '1.';
+						return "\n" . $this->process_list( $nested_matches[2], $nested_marker, $level + 1 );
+					},
+					$item_content
+				);
+
+				// Convert the current list item.
+				$item_content = trim( wp_strip_all_tags( $item_content ) );
+				return $indent . $marker . ' ' . $item_content;
+			},
+			$content
+		);
 	}
 
 	/**
@@ -208,8 +219,8 @@ class WP_To_MD_Converter {
 	 * @return string The converted link.
 	 */
 	private function convert_link( $matches ) {
-		$url = $matches[2];
-		$text = trim( strip_tags( $matches[3] ) );
+		$url  = $matches[2];
+		$text = trim( wp_strip_all_tags( $matches[3] ) );
 		return '[' . $text . '](' . $url . ')';
 	}
 
@@ -235,7 +246,7 @@ class WP_To_MD_Converter {
 	 * @return string The converted blockquote.
 	 */
 	private function convert_blockquote( $matches ) {
-		$lines = explode( "\n", trim( strip_tags( $matches[1] ) ) );
+		$lines    = explode( "\n", trim( wp_strip_all_tags( $matches[1] ) ) );
 		$markdown = '';
 		foreach ( $lines as $line ) {
 			$markdown .= '> ' . trim( $line ) . "\n";
@@ -265,10 +276,10 @@ class WP_To_MD_Converter {
 		$filename = sanitize_title( $post->post_title );
 
 		if ( $add_date ) {
-			$date = gmdate( 'Y-m-d', strtotime( $post->post_date_gmt ) );
+			$date     = gmdate( 'Y-m-d', strtotime( $post->post_date_gmt ) );
 			$filename = $date . '-' . $filename;
 		}
 
 		return $filename . '.md';
 	}
-} 
+}
