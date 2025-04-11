@@ -48,6 +48,9 @@ class WP_To_MD_Converter {
 		// Remove style tags.
 		$content = preg_replace( '/<style\b[^>]*>(.*?)<\/style>/is', '', $content );
 
+		// Remove trailing closing </figure> tags.
+		$content = preg_replace( '/<\/figure>/', '', $content );
+
 		return $content;
 	}
 
@@ -156,7 +159,7 @@ class WP_To_MD_Converter {
 	 */
 	private function convert_heading( $matches ) {
 		$level = $matches[1];
-		$text = trim( strip_tags( $matches[2] ) );
+		$text  = trim( strip_tags( $matches[2] ) );
 		return str_repeat( '#', $level ) . ' ' . $text . "\n\n";
 	}
 
@@ -179,17 +182,17 @@ class WP_To_MD_Converter {
 	 */
 	private function convert_unordered_list( $matches ) {
 		// Split into individual list items.
-		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
+		$items      = preg_split( '/<li[^>]*>/i', $matches[1] );
 		$list_items = array();
-		
+
 		foreach ( $items as $item ) {
 			if ( empty( trim( $item ) ) ) {
 				continue;
 			}
-			$item = preg_replace( '/<\/li>/', '', $item );
+			$item         = preg_replace( '/<\/li>/', '', $item );
 			$list_items[] = '* ' . trim( strip_tags( $item ) );
 		}
-		
+
 		// Join with literal \n for string comparison in tests.
 		return str_replace( "\n", '\n', implode( "\n", $list_items ) );
 	}
@@ -201,16 +204,16 @@ class WP_To_MD_Converter {
 	 * @return string The converted list.
 	 */
 	private function convert_ordered_list( $matches ) {
-		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
+		$items    = preg_split( '/<li[^>]*>/i', $matches[1] );
 		$markdown = '';
-		$counter = 1;
+		$counter  = 1;
 		foreach ( $items as $item ) {
 			if ( empty( trim( $item ) ) ) {
 				continue;
 			}
-			$item = preg_replace( '/<\/li>/', '', $item );
+			$item      = preg_replace( '/<\/li>/', '', $item );
 			$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
-			$counter++;
+			++$counter;
 		}
 		return $markdown . "\n";
 	}
@@ -222,7 +225,7 @@ class WP_To_MD_Converter {
 	 * @return string The converted link.
 	 */
 	private function convert_link( $matches ) {
-		$url = $matches[2];
+		$url  = $matches[2];
 		$text = trim( strip_tags( $matches[3] ) );
 		return '[' . $text . '](' . $url . ')';
 	}
@@ -249,7 +252,7 @@ class WP_To_MD_Converter {
 	 * @return string The converted blockquote.
 	 */
 	private function convert_blockquote( $matches ) {
-		$lines = explode( "\n", trim( strip_tags( $matches[1] ) ) );
+		$lines    = explode( "\n", trim( strip_tags( $matches[1] ) ) );
 		$markdown = '';
 		foreach ( $lines as $line ) {
 			$markdown .= '> ' . trim( $line ) . "\n";
@@ -276,15 +279,15 @@ class WP_To_MD_Converter {
 	 */
 	private function convert_block_image( $matches ) {
 		$figure_content = $matches[1];
-		
+
 		// Extract image URL.
 		$image_url = '';
-		
+
 		// First attempt to extract image ID from class attribute.
 		$image_id = null;
 		if ( preg_match( '/class="[^"]*wp-image-(\d+)[^"]*"/i', $figure_content, $class_matches ) ) {
 			$image_id = $class_matches[1];
-			
+
 			// Try to get the original image URL from the media library.
 			if ( function_exists( 'wp_get_original_image_url' ) ) {
 				$original_url = wp_get_original_image_url( $image_id );
@@ -299,15 +302,15 @@ class WP_To_MD_Converter {
 				}
 			}
 		}
-		
+
 		// Fallback to src attribute if no image ID found or couldn't get URL from media library.
 		if ( empty( $image_url ) && preg_match( '/<img[^>]+src=([\'"])(.*?)\1/i', $figure_content, $img_matches ) ) {
 			$image_url = $img_matches[2];
-			
+
 			// Get the original image URL by removing size parameters.
 			$image_url = preg_replace( '/-\d+x\d+\./', '.', $image_url );
 		}
-		
+
 		// Extract alt text.
 		$alt_text = '';
 		if ( preg_match( '/alt=([\'"])(.*?)\1/i', $figure_content, $alt_matches ) ) {
@@ -315,23 +318,23 @@ class WP_To_MD_Converter {
 		} else {
 			$alt_text = 'Image';
 		}
-		
+
 		// Extract caption if present.
 		$caption = '';
 		if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $figure_content, $caption_matches ) ) {
 			$caption = trim( strip_tags( $caption_matches[1] ) );
 		}
-		
+
 		// Build markdown image.
 		$markdown = '![' . $alt_text . '](' . $image_url;
-		
+
 		// Add caption as title if present.
 		if ( ! empty( $caption ) ) {
 			$markdown .= ' "' . $caption . '"';
 		}
-		
+
 		$markdown .= ')';
-		
+
 		return $markdown . "\n\n";
 	}
 
@@ -343,29 +346,29 @@ class WP_To_MD_Converter {
 	 */
 	private function convert_gallery( $matches ) {
 		$gallery_content = $matches[1];
-		$markdown = '';
-		
+		$markdown        = '';
+
 		// Extract all img tags from the gallery content
 		preg_match_all( '/<img[^>]+>/i', $gallery_content, $img_tags, PREG_SET_ORDER );
-		
+
 		if ( ! empty( $img_tags ) ) {
 			foreach ( $img_tags as $img_tag ) {
 				// Create a temporary figure content with just the img tag
 				$temp_content = $img_tag[0];
-				
+
 				// Look for a figcaption that follows this img tag
-				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos($gallery_content, $img_tag[0]) ) ) {
+				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_tag[0] ) ) ) {
 					$temp_content .= $caption_matches[0][0];
 				}
-				
+
 				// Create a temporary array with the structure expected by convert_block_image
 				$temp_matches = array( 1 => $temp_content );
-				
+
 				// Process the image
 				$markdown .= $this->convert_block_image( $temp_matches );
 			}
 		}
-		
+
 		return $markdown;
 	}
 
@@ -380,7 +383,7 @@ class WP_To_MD_Converter {
 		$filename = sanitize_title( $post->post_title );
 
 		if ( $add_date ) {
-			$date = gmdate( 'Y-m-d', strtotime( $post->post_date_gmt ) );
+			$date     = gmdate( 'Y-m-d', strtotime( $post->post_date_gmt ) );
 			$filename = $date . '-' . $filename;
 		}
 
