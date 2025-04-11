@@ -161,9 +161,10 @@ class WP_To_MD_Converter {
 	 * Convert unordered list to Markdown.
 	 *
 	 * @param array $matches The regex matches.
+	 * @param int   $level   The nesting level of the list.
 	 * @return string The converted list.
 	 */
-	private function convert_unordered_list( $matches ) {
+	private function convert_unordered_list( $matches, $level = 0 ) {
 		// Split into individual list items.
 		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
 		$list_items = array();
@@ -172,8 +173,43 @@ class WP_To_MD_Converter {
 			if ( empty( trim( $item ) ) ) {
 				continue;
 			}
+			
+			// Remove the closing li tag
 			$item = preg_replace( '/<\/li>/', '', $item );
-			$list_items[] = '* ' . trim( strip_tags( $item ) );
+			
+			// Check for nested lists
+			if ( preg_match( '/<ul[^>]*>(.*?)<\/ul>/is', $item, $nested_matches ) ) {
+				// Extract the nested list
+				$nested_list = $nested_matches[0];
+				// Remove the nested list from the item
+				$item = str_replace( $nested_list, '', $item );
+				// Process the nested list recursively
+				$nested_markdown = $this->convert_unordered_list( $nested_matches, $level + 1 );
+				// Add the item and the nested list
+				$list_items[] = '* ' . trim( strip_tags( $item ) );
+				$list_items[] = $nested_markdown;
+			} elseif ( preg_match( '/<ol[^>]*>(.*?)<\/ol>/is', $item, $nested_matches ) ) {
+				// Extract the nested ordered list
+				$nested_list = $nested_matches[0];
+				// Remove the nested list from the item
+				$item = str_replace( $nested_list, '', $item );
+				// Process the nested list recursively
+				$nested_markdown = $this->convert_ordered_list( $nested_matches, $level + 1 );
+				// Add the item and the nested list
+				$list_items[] = '* ' . trim( strip_tags( $item ) );
+				$list_items[] = $nested_markdown;
+			} else {
+				// No nested lists, just add the item
+				$list_items[] = '* ' . trim( strip_tags( $item ) );
+			}
+		}
+		
+		// Indent nested lists
+		if ( $level > 0 ) {
+			$indent = str_repeat( '  ', $level );
+			$list_items = array_map( function( $item ) use ( $indent ) {
+				return $indent . $item;
+			}, $list_items );
 		}
 		
 		// Join with literal \n for string comparison in tests.
@@ -184,20 +220,57 @@ class WP_To_MD_Converter {
 	 * Convert ordered list to Markdown.
 	 *
 	 * @param array $matches The regex matches.
+	 * @param int   $level   The nesting level of the list.
 	 * @return string The converted list.
 	 */
-	private function convert_ordered_list( $matches ) {
+	private function convert_ordered_list( $matches, $level = 0 ) {
 		$items = preg_split( '/<li[^>]*>/i', $matches[1] );
 		$markdown = '';
 		$counter = 1;
+		
 		foreach ( $items as $item ) {
 			if ( empty( trim( $item ) ) ) {
 				continue;
 			}
+			
+			// Remove the closing li tag
 			$item = preg_replace( '/<\/li>/', '', $item );
-			$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
+			
+			// Check for nested lists
+			if ( preg_match( '/<ul[^>]*>(.*?)<\/ul>/is', $item, $nested_matches ) ) {
+				// Extract the nested list
+				$nested_list = $nested_matches[0];
+				// Remove the nested list from the item
+				$item = str_replace( $nested_list, '', $item );
+				// Process the nested list recursively
+				$nested_markdown = $this->convert_unordered_list( $nested_matches, $level + 1 );
+				// Add the item and the nested list
+				$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
+				$markdown .= $nested_markdown;
+			} elseif ( preg_match( '/<ol[^>]*>(.*?)<\/ol>/is', $item, $nested_matches ) ) {
+				// Extract the nested ordered list
+				$nested_list = $nested_matches[0];
+				// Remove the nested list from the item
+				$item = str_replace( $nested_list, '', $item );
+				// Process the nested list recursively
+				$nested_markdown = $this->convert_ordered_list( $nested_matches, $level + 1 );
+				// Add the item and the nested list
+				$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
+				$markdown .= $nested_markdown;
+			} else {
+				// No nested lists, just add the item
+				$markdown .= $counter . '. ' . trim( strip_tags( $item ) ) . "\n";
+			}
+			
 			$counter++;
 		}
+		
+		// Indent nested lists
+		if ( $level > 0 ) {
+			$indent = str_repeat( '  ', $level );
+			$markdown = $indent . str_replace( "\n", "\n" . $indent, $markdown );
+		}
+		
 		return $markdown . "\n";
 	}
 
