@@ -142,6 +142,9 @@ class WP_To_MD_Converter {
 		// Convert horizontal rules.
 		$content = preg_replace( '/<hr[^>]*>/i', "\n---\n\n", $content );
 
+		// Remove any remaining </figure> tags that might be left after gallery conversion.
+		$content = preg_replace( '/<\/figure>/i', '', $content );
+
 		// Clean up multiple newlines.
 		$content = preg_replace( "/\n{3,}/", "\n\n", $content );
 
@@ -345,26 +348,29 @@ class WP_To_MD_Converter {
 		$gallery_content = $matches[1];
 		$markdown = '';
 		
-		// Extract all img tags from the gallery content
+		// Extract all img tags from the gallery content.
 		preg_match_all( '/<img[^>]+>/i', $gallery_content, $img_tags, PREG_SET_ORDER );
 		
 		if ( ! empty( $img_tags ) ) {
 			foreach ( $img_tags as $img_tag ) {
-				// Create a temporary figure content with just the img tag
+				// Create a temporary figure content with just the img tag.
 				$temp_content = $img_tag[0];
 				
-				// Look for a figcaption that follows this img tag
-				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos($gallery_content, $img_tag[0]) ) ) {
+				// Look for a figcaption that follows this img tag.
+				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_tag[0] ) ) ) {
 					$temp_content .= $caption_matches[0][0];
 				}
 				
-				// Create a temporary array with the structure expected by convert_block_image
+				// Create a temporary array with the structure expected by convert_block_image.
 				$temp_matches = array( 1 => $temp_content );
 				
-				// Process the image
+				// Process the image.
 				$markdown .= $this->convert_block_image( $temp_matches );
 			}
 		}
+		
+		// Clean up any trailing </figure> tags that might be in the content.
+		$markdown = preg_replace( '/<\/figure>\s*$/', '', $markdown );
 		
 		return $markdown;
 	}
