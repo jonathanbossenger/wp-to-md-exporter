@@ -94,4 +94,4 @@ register_activation_hook( __FILE__, array( 'WordPress_To_Markdown_Exporter', 'ac
 register_deactivation_hook( __FILE__, array( 'WordPress_To_Markdown_Exporter', 'deactivate' ) );
 
 // Initialize the plugin
-WordPress_To_Markdown_Exporter::get_instance(); 
+WordPress_To_Markdown_Exporter::get_instance();
