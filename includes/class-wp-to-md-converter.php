@@ -58,6 +58,20 @@ class WP_To_MD_Converter {
 	 * @return string The content with blocks converted to Markdown.
 	 */
 	private function handle_blocks( $content ) {
+		// Handle galleries by removing the figure tag and processing each image individually.
+		$content = preg_replace_callback(
+			'/<figure class="wp-block-gallery[^"]*"[^>]*>(.*?)<\/figure>/is',
+			array( $this, 'convert_gallery' ),
+			$content
+		);
+
+		// Convert WordPress block images.
+		$content = preg_replace_callback(
+			'/<figure class="wp-block-image[^"]*"[^>]*>(.*?)<\/figure>/is',
+			array( $this, 'convert_block_image' ),
+			$content
+		);
+
 		// Convert headings.
 		$content = preg_replace_callback(
 			'/<h([1-6])[^>]*>(.*?)<\/h\1>/i',
@@ -93,7 +107,7 @@ class WP_To_MD_Converter {
 			$content
 		);
 
-		// Convert images.
+		// Convert regular images.
 		$content = preg_replace_callback(
 			'/<img[^>]+src=([\'"])(.*?)\1[^>]*>/i',
 			array( $this, 'convert_image' ),
@@ -127,6 +141,9 @@ class WP_To_MD_Converter {
 
 		// Convert horizontal rules.
 		$content = preg_replace( '/<hr[^>]*>/i', "\n---\n\n", $content );
+
+		// Remove any remaining </figure> tags that might be left after gallery conversion.
+		$content = preg_replace( '/<\/figure>/i', '', $content );
 
 		// Clean up multiple newlines.
 		$content = preg_replace( "/\n{3,}/", "\n\n", $content );
@@ -255,6 +272,110 @@ class WP_To_MD_Converter {
 	}
 
 	/**
+	 * Convert WordPress block image to Markdown.
+	 *
+	 * @param array $matches The regex matches.
+	 * @return string The converted image.
+	 */
+	private function convert_block_image( $matches ) {
+		$figure_content = $matches[1];
+		
+		// Extract image URL.
+		$image_url = '';
+		
+		// First attempt to extract image ID from class attribute.
+		$image_id = null;
+		if ( preg_match( '/class="[^"]*wp-image-(\d+)[^"]*"/i', $figure_content, $class_matches ) ) {
+			$image_id = $class_matches[1];
+			
+			// Try to get the original image URL from the media library.
+			if ( function_exists( 'wp_get_original_image_url' ) ) {
+				$original_url = wp_get_original_image_url( $image_id );
+				if ( $original_url ) {
+					$image_url = $original_url;
+				}
+			} elseif ( function_exists( 'wp_get_attachment_url' ) ) {
+				// Fallback to wp_get_attachment_url if wp_get_original_image_url is not available.
+				$original_url = wp_get_attachment_url( $image_id );
+				if ( $original_url ) {
+					$image_url = $original_url;
+				}
+			}
+		}
+		
+		// Fallback to src attribute if no image ID found or couldn't get URL from media library.
+		if ( empty( $image_url ) && preg_match( '/<img[^>]+src=([\'"])(.*?)\1/i', $figure_content, $img_matches ) ) {
+			$image_url = $img_matches[2];
+			
+			// Get the original image URL by removing size parameters.
+			$image_url = preg_replace( '/-\d+x\d+\./', '.', $image_url );
+		}
+		
+		// Extract alt text.
+		$alt_text = '';
+		if ( preg_match( '/alt=([\'"])(.*?)\1/i', $figure_content, $alt_matches ) ) {
+			$alt_text = $alt_matches[2];
+		} else {
+			$alt_text = 'Image';
+		}
+		
+		// Extract caption if present.
+		$caption = '';
+		if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $figure_content, $caption_matches ) ) {
+			$caption = trim( strip_tags( $caption_matches[1] ) );
+		}
+		
+		// Build markdown image.
+		$markdown = '![' . $alt_text . '](' . $image_url;
+		
+		// Add caption as title if present.
+		if ( ! empty( $caption ) ) {
+			$markdown .= ' "' . $caption . '"';
+		}
+		
+		$markdown .= ')';
+		
+		return $markdown . "\n\n";
+	}
+
+	/**
+	 * Convert gallery to Markdown.
+	 *
+	 * @param array $matches The regex matches.
+	 * @return string The converted gallery.
+	 */
+	private function convert_gallery( $matches ) {
+		$gallery_content = $matches[1];
+		$markdown = '';
+		
+		// Extract all img tags from the gallery content.
+		preg_match_all( '/<img[^>]+>/i', $gallery_content, $img_tags, PREG_SET_ORDER );
+		
+		if ( ! empty( $img_tags ) ) {
+			foreach ( $img_tags as $img_tag ) {
+				// Create a temporary figure content with just the img tag.
+				$temp_content = $img_tag[0];
+				
+				// Look for a figcaption that follows this img tag.
+				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_tag[0] ) ) ) {
+					$temp_content .= $caption_matches[0][0];
+				}
+				
+				// Create a temporary array with the structure expected by convert_block_image.
+				$temp_matches = array( 1 => $temp_content );
+				
+				// Process the image.
+				$markdown .= $this->convert_block_image( $temp_matches );
+			}
+		}
+		
+		// Clean up any trailing </figure> tags that might be in the content.
+		$markdown = preg_replace( '/<\/figure>\s*$/', '', $markdown );
+		
+		return $markdown;
+	}
+
+	/**
 	 * Generate a filename for the markdown file.
 	 *
 	 * @param WP_Post $post     The post object.
@@ -271,4 +392,4 @@ class WP_To_MD_Converter {
 
 		return $filename . '.md';
 	}
-} 
+}
