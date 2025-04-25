@@ -346,4 +346,4 @@ class WP_To_MD_File_Handler {
 	public function get_base_dir() {
 		return $this->base_dir;
 	}
-} 
+}
