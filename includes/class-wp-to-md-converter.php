@@ -58,17 +58,10 @@ class WP_To_MD_Converter {
 	 * @return string The content with blocks converted to Markdown.
 	 */
 	private function handle_blocks( $content ) {
-		// Handle galleries by removing the figure tag and processing each image individually.
+		// Process all figure elements with a single regex to handle both galleries and images.
 		$content = preg_replace_callback(
-			'/<figure class="wp-block-gallery[^"]*"[^>]*>(.*?)<\/figure>/is',
-			array( $this, 'convert_gallery' ),
-			$content
-		);
-
-		// Convert WordPress block images.
-		$content = preg_replace_callback(
-			'/<figure class="wp-block-image[^"]*"[^>]*>(.*?)<\/figure>/is',
-			array( $this, 'convert_block_image' ),
+			'/<figure class="wp-block-(gallery|image)[^"]*"[^>]*>(.*?)<\/figure>/is',
+			array( $this, 'process_figure_element' ),
 			$content
 		);
 
@@ -149,6 +142,23 @@ class WP_To_MD_Converter {
 		$content = preg_replace( "/\n{3,}/", "\n\n", $content );
 
 		return trim( $content );
+	}
+
+	/**
+	 * Process figure elements (galleries and images).
+	 *
+	 * @param array $matches The regex matches.
+	 * @return string The converted content.
+	 */
+	private function process_figure_element( $matches ) {
+		$block_type = $matches[1];
+		$figure_content = $matches[2];
+		
+		if ( 'gallery' === $block_type ) {
+			return $this->convert_gallery( array( 1 => $figure_content ) );
+		} else {
+			return $this->convert_block_image( array( 1 => $figure_content ) );
+		}
 	}
 
 	/**
@@ -353,19 +363,62 @@ class WP_To_MD_Converter {
 		
 		if ( ! empty( $img_tags ) ) {
 			foreach ( $img_tags as $img_tag ) {
-				// Create a temporary figure content with just the img tag.
-				$temp_content = $img_tag[0];
+				$img_html = $img_tag[0];
 				
-				// Look for a figcaption that follows this img tag.
-				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_tag[0] ) ) ) {
-					$temp_content .= $caption_matches[0][0];
+				// Extract image URL.
+				$image_url = '';
+				
+				// First attempt to extract image ID from class attribute.
+				$image_id = null;
+				if ( preg_match( '/class="[^"]*wp-image-(\d+)[^"]*"/i', $img_html, $class_matches ) ) {
+					$image_id = $class_matches[1];
+					
+					// Try to get the original image URL from the media library.
+					if ( function_exists( 'wp_get_original_image_url' ) ) {
+						$original_url = wp_get_original_image_url( $image_id );
+						if ( $original_url ) {
+							$image_url = $original_url;
+						}
+					} elseif ( function_exists( 'wp_get_attachment_url' ) ) {
+						// Fallback to wp_get_attachment_url if wp_get_original_image_url is not available.
+						$original_url = wp_get_attachment_url( $image_id );
+						if ( $original_url ) {
+							$image_url = $original_url;
+						}
+					}
 				}
 				
-				// Create a temporary array with the structure expected by convert_block_image.
-				$temp_matches = array( 1 => $temp_content );
+				// Fallback to src attribute if no image ID found or couldn't get URL from media library.
+				if ( empty( $image_url ) && preg_match( '/src=([\'"])(.*?)\1/i', $img_html, $src_matches ) ) {
+					$image_url = $src_matches[2];
+					
+					// Get the original image URL by removing size parameters.
+					$image_url = preg_replace( '/-\d+x\d+\./', '.', $image_url );
+				}
 				
-				// Process the image.
-				$markdown .= $this->convert_block_image( $temp_matches );
+				// Extract alt text.
+				$alt_text = '';
+				if ( preg_match( '/alt=([\'"])(.*?)\1/i', $img_html, $alt_matches ) ) {
+					$alt_text = $alt_matches[2];
+				} else {
+					$alt_text = 'Image';
+				}
+				
+				// Look for a figcaption that follows this img tag.
+				$caption = '';
+				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_html ) ) ) {
+					$caption = trim( strip_tags( $caption_matches[1] ) );
+				}
+				
+				// Build markdown image.
+				$markdown .= '![' . $alt_text . '](' . $image_url;
+				
+				// Add caption as title if present.
+				if ( ! empty( $caption ) ) {
+					$markdown .= ' "' . $caption . '"';
+				}
+				
+				$markdown .= ")\n\n";
 			}
 		}
 		
