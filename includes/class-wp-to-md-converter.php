@@ -407,7 +407,7 @@ class WP_To_MD_Converter {
 				// Look for a figcaption that follows this img tag.
 				$caption = '';
 				if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/is', $gallery_content, $caption_matches, PREG_OFFSET_CAPTURE, strpos( $gallery_content, $img_html ) ) ) {
-					$caption = trim( strip_tags( $caption_matches[1] ) );
+					$caption = trim( strip_tags( $caption_matches[1][0] ) );
 				}
 				
 				// Build markdown image.
